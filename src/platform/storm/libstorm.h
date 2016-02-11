@@ -4,6 +4,8 @@
 int libmsgpack_mp_pack(lua_State *L);
 int libmsgpack_mp_unpack(lua_State *L);
 
+int libbosswave_bw_sendmsg(lua_State* L);
+
 int libstorm_io_get( lua_State *L );
 int libstorm_io_getd( lua_State *L );
 int libstorm_os_getnodeid( lua_State *L );
@@ -25,6 +27,27 @@ int libstorm_net_stats(lua_State *L);
 int libstorm_net_clear_stats(lua_State *L);
 int libstorm_net_retry_stats(lua_State *L);
 int libstorm_net_clear_retry_stats(lua_State *L);
+int libstorm_net_tcpactivesocket(lua_State* L);
+int libstorm_net_tcpaddconnectdone(lua_State* L);
+int libstorm_net_tcpaddsenddone(lua_State* L);
+int libstorm_net_tcpaddrecvready(lua_State* L);
+int libstorm_net_tcpaddconnectionlost(lua_State* L);
+int libstorm_net_tcppassivesocket(lua_State* L);
+int libstorm_net_tcpaddacceptdone(lua_State* L);
+int libstorm_net_tcpbind(lua_State* L);
+int libstorm_net_tcpconnect(lua_State* L);
+int libstorm_net_tcplistenaccept(lua_State* L);
+int libstorm_net_tcpsend(lua_State* L);
+int libstorm_net_tcpoutstanding(lua_State* L);
+int libstorm_net_tcprecv(lua_State* L);
+int libstorm_net_tcprecvfull(lua_State* L);
+int libstorm_net_tcpshutdown(lua_State* L);
+int libstorm_net_tcpclose(lua_State* L);
+int libstorm_net_tcpabort(lua_State* L);
+int libstorm_net_tcpfd(lua_State* L);
+int libstorm_net_tcpisestablished(lua_State* L);
+int libstorm_net_tcphasrcvdfin(lua_State* L);
+int libstorm_net_tcppeerinfo(lua_State* L);
 int libstorm_io_watch_single(lua_State *L);
 int libstorm_io_watch_all(lua_State *L);
 int libstorm_io_cancel_watch(lua_State *L);

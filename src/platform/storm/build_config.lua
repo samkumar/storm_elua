@@ -25,8 +25,9 @@ function get_platform_modules( board, cpu )
       n  = { lib='"n"', map = "contrib_native_map", open = false},
       bl  = { lib='"bl"', map = "libstorm_bl_map", open = false},
       aes  = { lib='"aes"', map = "libstorm_aes_map", open = false},
-      spi = { lib='"spi"', map ="libstorm_spi_map", open = false},
-      flash = { lib='"flash"', map ="libstorm_flash_map", open = false}
+      spi = { lib='"spi"', map = "libstorm_spi_map", open = false},
+      flash = { lib='"flash"', map ="libstorm_flash_map", open = false},
+      bw = { lib='"bw"', map = "libbosswave_bw_map", open = false}
   }
   return m
 end
