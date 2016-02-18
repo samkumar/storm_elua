@@ -101,7 +101,6 @@ int libbosswave_bw_sendend(lua_State* L) {
     return 0;
 }
 
-// All messages except setentity
 // Lua: storm.bw.sendmsg(socket, seqno, msg, kv, po, ro)
 int libbosswave_bw_sendmsg(lua_State* L) {
     int i;
