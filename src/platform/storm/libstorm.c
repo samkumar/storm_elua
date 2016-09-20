@@ -120,6 +120,10 @@ int32_t __attribute__((naked)) k_syscall_ex_ri32_u32_cptr_int_u16ptr(uint32_t id
 {
     __syscall_body(ABI_ID_SYSCALL_EX);
 }
+int32_t __attribute__((naked)) k_syscall_ex_ri32_u32_iptr_iptr_iptr_iptr_iptr_iptr_iptr(uint32_t id, uint32_t fd, int* segsrcvd, int* segssent, int* sackssent, int* srtt, int* delacks, int* txcnt, int* rxcnt)
+{
+    __syscall_body(ABI_ID_SYSCALL_EX);
+}
 
 //Some driver specific syscalls
 //--------- GPIO
@@ -210,6 +214,7 @@ int32_t __attribute__((naked)) k_syscall_ex_ri32_u32_cptr_int_u16ptr(uint32_t id
 #define tcp_isestablished(fd) k_syscall_ex_ri32_u32(0xc0f, (fd))
 #define tcp_hasrcvdfin(fd) k_syscall_ex_ri32_u32(0xc10, (fd))
 #define tcp_peerinfo(fd, addrbuf, addrbuflen, portptr) k_syscall_ex_ri32_u32_cptr_int_u16ptr(0xc11, (fd), (addrbuf), (addrbuflen), (portptr))
+#define tcp_stats(fd, segsrcvd, segssent, sackssent, srtt, delacks, txcnt, rxcnt) k_syscall_ex_ri32_u32_iptr_iptr_iptr_iptr_iptr_iptr_iptr(0xc12, (fd), (segsrcvd), (segssent), (sackssent), (srtt), (delacks), (txcnt), (rxcnt))
 
 lua_State *_cb_L;
 #define MAXPINSPEC 20
@@ -642,7 +647,7 @@ int libstorm_io_set_pull( lua_State *L )
     for( i = 2; i <= lua_gettop( L ); i ++ )
     {
         pinspec = luaL_checkint( L, i );
-        if (pinspec < 0 || pinspec > MAXPINSPEC) 
+        if (pinspec < 0 || pinspec > MAXPINSPEC)
             return luaL_error( L, "invalid IO pin");
         rv = simplegpio_set_pull(dir, pinspec_map[pinspec]);
         if (rv != 0)
@@ -959,6 +964,7 @@ typedef struct {
     uint8_t* recv_reass_buf; // Buffer for packet reception and reassembly
 } storm_tcp_socket_t;
 
+
 void free_recv_reass_buf(storm_tcp_socket_t* sock) {
     if (sock->recv_reass_buf != NULL) {
         free(sock->recv_reass_buf);
@@ -993,10 +999,10 @@ int libstorm_net_senddone_cb(void* sock_ptr, uint32_t howmany) {
     uint32_t totalbytesdone;
     int rv;
     const char* msg;
-    
+
     /* Free HOWMANY outstanding sendstates. */
     totalbytesdone = tcp_free_sendstates(_cb_L, sock, howmany);
-    
+
     /* Invoke the sendDone callback to inform the user how many bytes were removed. */
     if (sock->sendDone_cb_ref == LUA_NOREF) {
         return 0;
@@ -1110,14 +1116,14 @@ int libstorm_net_tcpaddconnectdone(lua_State* L) {
     char* errparam = "expected (socket, connectDone)";
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     helper_reg_callback(L, &sock->connectDone_cb_ref);
     return 0;
 }
@@ -1128,14 +1134,14 @@ int libstorm_net_tcpaddsenddone(lua_State* L) {
     char* errparam = "expected (socket, sendDone)";
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     helper_reg_callback(L, &sock->sendDone_cb_ref);
     return 0;
 }
@@ -1146,14 +1152,14 @@ int libstorm_net_tcpaddrecvready(lua_State* L) {
     char* errparam = "expected (socket, recvReady)";
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     helper_reg_callback(L, &sock->recvReady_cb_ref);
     return 0;
 }
@@ -1164,14 +1170,14 @@ int libstorm_net_tcpaddconnectionlost(lua_State* L) {
     char* errparam = "expected (socket, connectionLost)";
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     helper_reg_callback(L, &sock->connectionLost_cb_ref);
     return 0;
 }
@@ -1193,11 +1199,11 @@ int libstorm_net_acceptdone_cb(void* sock_ptr, uint32_t newfd) {
         free_recv_reass_buf(sock); // Free the buffers that would be used for the new socket
         return luaL_error(_cb_L, "out of memory");
     }
-    
+
     // Copy the buffer into the new socket structure
     newsock->recv_reass_buf = sock->recv_reass_buf;
     sock->recv_reass_buf = NULL;
-    
+
     lua_pushlightuserdata(_cb_L, newsock);
     lua_pushlightuserdata(_cb_L, sock);
     if ((rv = lua_pcall(_cb_L, 2, 0, 0)) != 0)
@@ -1238,14 +1244,14 @@ int libstorm_net_tcpaddacceptdone(lua_State* L) {
     char* errparam = "expected (socket, acceptDone)";
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (!sock->passive)
         return luaL_error(L, "expected passive socket");
-        
+
     helper_reg_callback(L, &sock->acceptDone_cb_ref);
     return 0;
 }
@@ -1258,14 +1264,14 @@ int libstorm_net_tcpbind(lua_State* L) {
     int port;
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     port = luaL_checkint(L, 2);
     rv = tcp_bind(sock->fd, (uint32_t) port);
-    
+
     lua_pushnumber(L, rv);
     return 1;
 }
@@ -1285,35 +1291,35 @@ int libstorm_net_tcpconnect(lua_State* L) {
     size_t recbufsize;
     int32_t rv;
     uint8_t* rrbuf;
-    
+
     if (lua_gettop(L) != 4 && !has_connectDone)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     faddr = luaL_checkstring(L, 2);
     fport = luaL_checkint(L, 3);
     recwinint = luaL_checkint(L, 4);
-    
+
     if (recwinint <= 0)
         return luaL_error(L, errparam);
-    
+
     recbufsize = 1 + (size_t) recwinint; // Add 1 because the buffer needs to be one greater than the window size
     rrbuf = alloc_recbuf(recbufsize);
     if (rrbuf == NULL)
         return luaL_error(L, "out of memory");
-    
+
     if (has_connectDone) {
         helper_reg_callback(L, &sock->connectDone_cb_ref);
     }
-    
+
     rv = tcp_connect(sock->fd, (char*) faddr, fport, rrbuf, recbufsize, rrbuf + recbufsize);
-    
+
     if (rv != 0) {
         // The connect failed right away
         free(rrbuf);
@@ -1321,7 +1327,7 @@ int libstorm_net_tcpconnect(lua_State* L) {
         free_recv_reass_buf(sock);
         sock->recv_reass_buf = rrbuf;
     }
-    
+
     lua_pushnumber(L, rv);
     return 1;
 }
@@ -1335,33 +1341,33 @@ int libstorm_net_tcplistenaccept(lua_State* L) {
     int recwinint;
     size_t recbufsize;
     int rv;
-    
+
     if (lua_gettop(L) != 2 && !has_acceptDone)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (!sock->passive)
         return luaL_error(L, "expected passive socket");
-        
+
     recwinint = luaL_checkint(L, 2);
     if (recwinint <= 0)
         return luaL_error(L, errparam);
-        
+
     recbufsize = 1 + (size_t) recwinint;
-        
+
     rrbuf = alloc_recbuf(recbufsize);
     if (rrbuf == NULL)
         return luaL_error(L, "out of memory");
-        
+
     if (has_acceptDone) {
         helper_reg_callback(L, &sock->acceptDone_cb_ref);
     }
-    
+
     rv = tcp_listenaccept(sock->fd, rrbuf, recbufsize, rrbuf + recbufsize);
-    
+
     if (rv) {
         free(rrbuf);
         // Invoke the callback right away, to indicate the error
@@ -1377,7 +1383,7 @@ int libstorm_net_tcplistenaccept(lua_State* L) {
         free_recv_reass_buf(sock);
         sock->recv_reass_buf = rrbuf;
     }
-    
+
     lua_pushnumber(L, rv);
     return 1;
 }
@@ -1405,21 +1411,21 @@ int libstorm_net_tcpsend(lua_State* L) {
     int errno;
     int copy;
     int state = 0;
-    
+
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     buffer = luaL_checklstring(L, 2, &buflen);
-    
+
     copy = (buflen <= SENDMAXCOPY);
-    
+
     if (copy) {
         if (extracopybuf == NULL) {
             sstate = malloc(sizeof(struct sendstate) + COPYBUFSIZE);
@@ -1430,7 +1436,7 @@ int libstorm_net_tcpsend(lua_State* L) {
     } else {
         sstate = malloc(sizeof(struct sendstate));
     }
-    
+
     if (sstate == NULL) {
         return luaL_error(L, "out of memory");
     }
@@ -1438,23 +1444,23 @@ int libstorm_net_tcpsend(lua_State* L) {
     bufent = &sstate->entry;
     bufent->iov.iov_next = NULL;
     bufent->iov.iov_len = buflen;
-        
+
     if (copy) {
         bufent->iov.iov_base = (uint8_t*) (sstate + 1);
         bufent->extraspace = COPYBUFSIZE - buflen;
         memcpy(bufent->iov.iov_base, buffer, buflen);
-        
+
         sstate->ref = LUA_NOREF;
     } else {
         bufent->iov.iov_base = (uint8_t*) buffer;
         bufent->extraspace = 0;
-        
+
         sstate->ref = luaL_ref(L, LUA_REGISTRYINDEX);
     }
-    
-    
+
+
     errno = (int) tcp_send(sock->fd, bufent, &state);
-    
+
     if (state == 1) {
         // The Kernel has a reference to this buffer, and we must keep track of it
         if (sock->tail == NULL) {
@@ -1473,12 +1479,12 @@ int libstorm_net_tcpsend(lua_State* L) {
             free(sstate);
         }
     }
-    
+
     if (state != 0) {
         // The send didn't fail, so we need to keep track of queued bytes
         sock->numoutstanding += buflen;
     }
-    
+
     lua_pushnumber(L, errno);
     lua_pushnumber(L, state);
     return 2;
@@ -1522,17 +1528,17 @@ uint32_t tcp_free_sendstates(lua_State* L, storm_tcp_socket_t* sock, uint32_t ho
 int libstorm_net_tcpoutstanding(lua_State* L) {
     char* errparam = "expected (socket)";
     storm_tcp_socket_t* sock;
-    
+
     if (lua_gettop(L) != 1)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     lua_pushnumber(L, sock->numoutstanding);
     return 1;
 }
@@ -1545,30 +1551,30 @@ int libstorm_net_tcprecv(lua_State* L) {
     int numbytes;
     size_t bytesread;
     int errno;
-    
+
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     numbytes = luaL_checkint(L, 2);
     buffer = malloc((size_t) numbytes);
     if (!buffer) {
         return luaL_error(L, "out of memory");
     }
-    
+
     errno = (int) tcp_receive(sock->fd, (uint8_t*) buffer, (uint32_t) numbytes, (uint32_t*) &bytesread);
-    
+
     lua_pushnumber(L, errno);
     lua_pushlstring(L, (char*) buffer, bytesread);
-    
+
     free(buffer);
-    
+
     return 2;
 }
 
@@ -1580,7 +1586,7 @@ int libstorm_net_tcptryrecv(lua_State* L) {
     int origcallback = lua_tointeger(L, lua_upvalueindex(5)); // the original callback to restore when done
     int gotfin = lua_toboolean(L, 2);
     // At upvalue index 6 is the function that we call once either (1) we finish sending, or (2) we encounter an error.
-    
+
     int errno;
     size_t numbytes;
     luaL_unref(L, LUA_REGISTRYINDEX, sock->recvReady_cb_ref);
@@ -1618,17 +1624,17 @@ int libstorm_net_tcprecvfull(lua_State* L) {
     char* buffer;
     int numbytes;
     int oldcallback;
-    
+
     if (lua_gettop(L) != 3)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     if (tcp_hasrcvdfin(sock->fd)) {
         lua_pushvalue(L, 3); // the callback
         lua_pushstring(L, "");
@@ -1636,16 +1642,16 @@ int libstorm_net_tcprecvfull(lua_State* L) {
         lua_call(L, 2, 0);
         return 0;
     }
-        
+
     numbytes = luaL_checkint(L, 2);
     buffer = malloc((size_t) numbytes);
     if (!buffer) {
         return luaL_error(L, "out of memory");
     }
-    
+
     oldcallback = sock->recvReady_cb_ref;
     sock->recvReady_cb_ref = LUA_NOREF;
-    
+
     lua_pushvalue(L, 1);
     lua_pushlightuserdata(L, buffer);
     lua_pushvalue(L, 2);
@@ -1665,26 +1671,26 @@ int libstorm_net_tcpshutdown(lua_State* L) {
     storm_tcp_socket_t* sock;
     int how;
     int32_t rv;
-    
+
     if (lua_gettop(L) != 2)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     how = luaL_checkint(L, 2);
-    
+
     rv = tcp_shutdown(sock->fd, (uint32_t) how);
-    
+
     if (how == SHUT_RD || how == SHUT_RDWR) {
         // Shutting down READs can never fail
         free_recv_reass_buf(sock);
     }
-    
+
     lua_pushnumber(L, rv);
     return 1;
 }
@@ -1694,22 +1700,22 @@ int libstorm_net_tcpclose(lua_State* L) {
     char* errparam = "expected (socket)";
     storm_tcp_socket_t* sock;
     int rv;
-    
+
     if (lua_gettop(L) != 1)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->numoutstanding > 0) {
     	// The send buffer is about to be reclaimed, so we need to abort the connection
     	tcp_abort(sock->fd);
     }
-        
+
     rv = tcp_close(sock->fd);
     free_recv_reass_buf(sock);
-    
+
     if (sock->passive) {
         luaL_unref(L, LUA_REGISTRYINDEX, sock->acceptDone_cb_ref);
     } else {
@@ -1719,9 +1725,9 @@ int libstorm_net_tcpclose(lua_State* L) {
         luaL_unref(L, LUA_REGISTRYINDEX, sock->connectionLost_cb_ref);
         tcp_free_sendstates(L, sock, (uint32_t) 0xFFFFFFFFu);
     }
-    
+
     free(sock);
-    
+
     lua_pushnumber(L, rv);
     return 1;
 }
@@ -1731,19 +1737,19 @@ int libstorm_net_tcpabort(lua_State* L) {
     char* errparam = "expected (socket)";
     storm_tcp_socket_t* sock;
     int rv;
-    
+
     if (lua_gettop(L) != 1)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     rv = tcp_abort(sock->fd);
-    
+
     if (rv != 0)
         free_recv_reass_buf(sock);
-    
+
     lua_pushnumber(L, rv);
     return 1;
 }
@@ -1752,14 +1758,14 @@ int libstorm_net_tcpabort(lua_State* L) {
 int libstorm_net_tcpfd(lua_State* L) {
     char* errparam = "expected (socket)";
     storm_tcp_socket_t* sock;
-    
+
     if (lua_gettop(L) != 1)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     lua_pushnumber(L, sock->fd);
     return 1;
 }
@@ -1769,14 +1775,14 @@ int libstorm_net_tcpisestablished(lua_State* L) {
     char* errparam = "expected (socket)";
     storm_tcp_socket_t* sock;
     int32_t isestablished;
-    
+
     if (lua_gettop(L) != 1)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     isestablished = tcp_isestablished(sock->fd);
     lua_pushboolean(L, (int) isestablished);
     return 1;
@@ -1787,14 +1793,14 @@ int libstorm_net_tcphasrcvdfin(lua_State* L) {
     char* errparam = "expected (socket)";
     storm_tcp_socket_t* sock;
     int32_t gotfin;
-    
+
     if (lua_gettop(L) != 1)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     gotfin = tcp_hasrcvdfin(sock->fd);
     lua_pushboolean(L, (int) gotfin);
     return 1;
@@ -1806,21 +1812,54 @@ int libstorm_net_tcppeerinfo(lua_State* L) {
     storm_tcp_socket_t* sock;
     char addrbuf[40];
     uint16_t port;
-    
+
     if (lua_gettop(L) != 1)
         return luaL_error(L, errparam);
-        
+
     sock = lua_touserdata(L, 1);
     if (!sock)
         return luaL_error(L, errparam);
-        
+
     if (sock->passive)
         return luaL_error(L, "expected active socket");
-        
+
     tcp_peerinfo(sock->fd, addrbuf, 40, &port);
     lua_pushstring(L, addrbuf);
     lua_pushnumber(L, port);
     return 2;
+}
+
+int libstorm_net_tcpstats(lua_State* L) {
+    char* errparam = "expected (socket)";
+    storm_tcp_socket_t* sock;
+    int segs_rcvd;
+    int segs_sent;
+    int sacks_sent;
+    int srtt;
+    int delacks;
+    int txcnt;
+    int rxcnt;
+
+    if (lua_gettop(L) != 1)
+        return luaL_error(L, errparam);
+
+    sock = lua_touserdata(L, 1);
+    if (!sock)
+        return luaL_error(L, errparam);
+
+    if (sock->passive)
+        return luaL_error(L, "expected active socket");
+
+    tcp_stats(sock->fd, &segs_rcvd, &segs_sent, &sacks_sent, &srtt, &delacks, &txcnt, &rxcnt);
+
+    lua_pushinteger(L, segs_rcvd);
+    lua_pushinteger(L, segs_sent);
+    lua_pushinteger(L, sacks_sent);
+    lua_pushinteger(L, srtt);
+    lua_pushinteger(L, delacks);
+    lua_pushinteger(L, txcnt);
+    lua_pushinteger(L, rxcnt);
+    return 7;
 }
 
 static int traceback (lua_State *L) {
@@ -2003,7 +2042,7 @@ static int libstorm_io_watch_impl(lua_State *L, int repeat)
     }
     watchtype = luaL_checkinteger(L, 1);
     pin = luaL_checkinteger(L, 2);
-    if (pin < 0 || pin > MAXPINSPEC)	
+    if (pin < 0 || pin > MAXPINSPEC)
         return luaL_error( L, "invalid IO pin");
     if (watchtype < 0 || watchtype > 2)
         return luaL_error(L, "invalid change type");
@@ -2264,7 +2303,7 @@ int libstorm_bl_addcharacteristic(lua_State *L)
     cbref = luaL_ref(L, LUA_REGISTRYINDEX); //callback
     uuid = lua_tonumber(L, 2);
     svc_handle = lua_tonumber(L, 1);
-    
+
     handle = bl_addcharacteristic(svc_handle, uuid, bl_write_callback, (void*) cbref);
     lua_pushnumber(L, handle);
     return 1;
@@ -2490,7 +2529,7 @@ int libstorm_flash_read(lua_State *L)
 }
 // Module function map
 #define MIN_OPT_LEVEL 2
-#include "lrodefs.h" 
+#include "lrodefs.h"
 const LUA_REG_TYPE libstorm_io_map[] =
 {
     { LSTRKEY( "set_mode" ), LFUNCVAL ( libstorm_io_set_mode ) },
@@ -2629,6 +2668,7 @@ const LUA_REG_TYPE libstorm_net_map[] =
     { LSTRKEY( "tcpisestablished" ), LFUNCVAL( libstorm_net_tcpisestablished ) },
     { LSTRKEY( "tcphasrcvdfin" ), LFUNCVAL( libstorm_net_tcphasrcvdfin ) },
     { LSTRKEY( "tcppeerinfo" ), LFUNCVAL( libstorm_net_tcppeerinfo ) },
+    { LSTRKEY( "tcpstats" ), LFUNCVAL( libstorm_net_tcpstats ) },
     { LSTRKEY( "SHUT_RD" ), LNUMVAL ( SHUT_RD ) },
     { LSTRKEY( "SHUT_WR" ), LNUMVAL ( SHUT_WR ) },
     { LSTRKEY( "SHUT_RDWR" ), LNUMVAL ( SHUT_RDWR ) },
