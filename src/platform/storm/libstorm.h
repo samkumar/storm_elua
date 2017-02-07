@@ -39,4 +39,12 @@ int libstorm_bl_notify(lua_State *L);
 
 void libstorm_os_calloutputhook(const char* buffer, size_t length);
 
+int libstorm_net_tcppassivesocket(lua_State* L);
+int libstorm_net_tcpbind(lua_State* L);
+int libstorm_net_tcplistenaccept(lua_State* L);
+int libstorm_net_tcpaddconnectdone(lua_State* L);
+int libstorm_net_tcprecvfull(lua_State* L);
+int libstorm_net_tcpaddrecvready(lua_State* L);
+int libstorm_net_tcprecv(lua_State* L);
+
 #endif

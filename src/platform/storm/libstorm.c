@@ -1600,6 +1600,79 @@ int libstorm_net_tcprecv(lua_State* L) {
     return 2;
 }
 
+int libstorm_net_tcptrysend(lua_State* L) {
+    storm_tcp_socket_t* sock = lua_touserdata(L, lua_upvalueindex(1)); // active TCP socket
+    // At upvalue index 2 is the Lua string representing what we're trying to send.
+    size_t maxbuflen = lua_tointeger(L, lua_upvalueindex(3)); // the maximum length of the virtual send buffer
+    int origcallback = lua_tointeger(L, lua_upvalueindex(4)); // the original callback to restore when done
+    // At upvalue index 5 is the function that we call once either (1) we finish sending, or (2) we encounter an error.
+
+    /* The argument to this function (at the top of the stack) is the number of
+     * bytes freed. It is not used. */
+
+    luaL_unref(L, LUA_REGISTRYINDEX, sock->sendDone_cb_ref);
+    sock->sendDone_cb_ref = LUA_NOREF;
+
+    if (sock->numoutstanding < maxbuflen) {
+        /* Just send the whole thing. The way our buffer works, this is actually
+         * way more efficient than batching the send.
+         */
+        lua_pushlightfunction(L, libstorm_net_tcpsend);
+        lua_pushvalue(L, lua_upvalueindex(1)); // the socket
+        lua_pushvalue(L, lua_upvalueindex(2)); // the buffer
+        lua_call(L, 2, 1);
+
+        // Restore the old callback
+        sock->sendDone_cb_ref = origcallback;
+
+        // errno is at the top of the stack
+        lua_pushvalue(L, lua_upvalueindex(5));
+        lua_pushvalue(L, -2);
+        lua_call(L, 1, 0);
+    } else {
+        // Try sending again
+        lua_pushvalue(L, lua_upvalueindex(1));
+        lua_pushvalue(L, lua_upvalueindex(2));
+        lua_pushvalue(L, lua_upvalueindex(3));
+        lua_pushvalue(L, lua_upvalueindex(4));
+        lua_pushvalue(L, lua_upvalueindex(5));
+        lua_pushcclosure(L, libstorm_net_tcptrysend, 5);
+        sock->sendDone_cb_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    }
+    return 0;
+}
+
+// Lua: storm.net.tcpsendwithmax(socket, buffer, sendbufsize, callback)
+// Uses the sendReady callback to repeatedly calls recv until the full number of bytes is received.
+// Restores sendReady at the end (which is why this can't just wrap around the other functions above)
+int libstorm_net_tcpsendwithmax(lua_State* L) {
+    char* errparam = "expected (socket, buffer, sendbufsize, callback)";
+    storm_tcp_socket_t* sock;
+    int oldcallback;
+
+    if (lua_gettop(L) != 4)
+        return luaL_error(L, errparam);
+
+    sock = lua_touserdata(L, 1);
+    if (!sock)
+        return luaL_error(L, errparam);
+
+    if (sock->passive)
+        return luaL_error(L, "expected active socket");
+
+    oldcallback = sock->sendDone_cb_ref;
+    sock->sendDone_cb_ref = LUA_NOREF;
+
+    lua_pushvalue(L, 1);
+    lua_pushvalue(L, 2);
+    lua_pushvalue(L, 3);
+    lua_pushnumber(L, oldcallback);
+    lua_pushvalue(L, 4);
+    lua_pushcclosure(L, libstorm_net_tcptrysend, 5);
+    lua_call(L, 0, 0);
+    return 0;
+}
+
 int libstorm_net_tcptryrecv(lua_State* L) {
     storm_tcp_socket_t* sock = lua_touserdata(L, lua_upvalueindex(1)); // active TCP socket
     uint8_t* buffer = lua_touserdata(L, lua_upvalueindex(2)); // the data buffer to receive into
@@ -2687,6 +2760,7 @@ const LUA_REG_TYPE libstorm_net_map[] =
     { LSTRKEY( "tcpabort" ), LFUNCVAL ( libstorm_net_tcpabort ) },
     { LSTRKEY( "tcpfd" ), LFUNCVAL ( libstorm_net_tcpfd ) },
     { LSTRKEY( "tcpoutstanding" ), LFUNCVAL( libstorm_net_tcpoutstanding ) },
+    { LSTRKEY( "tcpsendwithmax" ), LFUNCVAL( libstorm_net_tcpsendwithmax ) },
     { LSTRKEY( "tcprecvfull" ), LFUNCVAL( libstorm_net_tcprecvfull ) },
     { LSTRKEY( "tcpisestablished" ), LFUNCVAL( libstorm_net_tcpisestablished ) },
     { LSTRKEY( "tcphasrcvdfin" ), LFUNCVAL( libstorm_net_tcphasrcvdfin ) },
